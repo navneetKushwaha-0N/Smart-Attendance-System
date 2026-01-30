@@ -11,7 +11,7 @@ function DashboardLayout({ title, children, onLogout, extraRight }) {
             onClick={onLogout}
             className="px-3 py-1 text-sm rounded bg-slate-700 hover:bg-slate-600"
           >
-            Logout
+            Logoutt
           </button>
         </div>
       </header>
