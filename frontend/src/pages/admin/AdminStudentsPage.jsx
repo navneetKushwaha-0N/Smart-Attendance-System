@@ -41,7 +41,6 @@ function AdminStudentsPage() {
 
   useEffect(() => {
     loadStudents();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleFilterChange = (e) => {
@@ -61,16 +60,7 @@ function AdminStudentsPage() {
 
   const startEdit = (s) => {
     setEditingId(s._id);
-    setForm({
-      name: s.name || '',
-      admissionNumber: s.admissionNumber || '',
-      mobileNumber: s.mobileNumber || '',
-      email: s.email || '',
-      semester: s.semester || '',
-      section: s.section || '',
-      department: s.department || '',
-      status: s.status || 'ACTIVE',
-    });
+    setForm({ ...s });
   };
 
   const cancelEdit = () => {
@@ -102,7 +92,6 @@ function AdminStudentsPage() {
     setLoading(true);
     try {
       await api.delete(`/admin/students/${id}`);
-      if (editingId === id) cancelEdit();
       await loadStudents();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to delete student');
@@ -111,21 +100,30 @@ function AdminStudentsPage() {
     }
   };
 
+  // ✅ QR DOWNLOAD FUNCTION
+  const downloadQR = (qrData, name) => {
+    const link = document.createElement('a');
+    link.href = qrData; // backend should send base64 or image URL
+    link.download = `${name}_QR.png`;
+    link.click();
+  };
+
   const statusBadge = (status) => {
     const map = {
-      ACTIVE: 'bg-emerald-500/15 text-emerald-300',
-      INACTIVE: 'bg-amber-500/15 text-amber-300',
-      DEBARRED: 'bg-red-500/15 text-red-300',
+      ACTIVE: 'bg-emerald-500/20 text-emerald-300',
+      INACTIVE: 'bg-yellow-500/20 text-yellow-300',
+      DEBARRED: 'bg-red-500/20 text-red-300',
     };
-    return map[status] || 'bg-slate-500/15 text-slate-300';
+    return map[status] || 'bg-slate-500/20 text-slate-300';
   };
 
   return (
-    <div className="space-y-6 text-slate-100">
-      <h2 className="text-xl font-semibold">Student Management</h2>
+    <div className="space-y-6 text-white">
+
+      <h2 className="text-2xl font-semibold">Student Management</h2>
 
       {error && (
-        <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+        <div className="bg-red-500/10 border border-red-500/20 px-4 py-2 rounded-xl text-sm">
           {error}
         </div>
       )}
@@ -133,139 +131,116 @@ function AdminStudentsPage() {
       {/* Filters */}
       <form
         onSubmit={applyFilters}
-        className="
-          rounded-xl border border-white/5
-          bg-slate-900/70 backdrop-blur
-          p-4 flex flex-wrap gap-3 items-end
-        "
+        className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 bg-white/5 border border-white/10 p-4 rounded-2xl backdrop-blur"
       >
-        {[
-          { label: 'Search', name: 'search', placeholder: 'Name / Admission No' },
-          { label: 'Department', name: 'department' },
-          { label: 'Section', name: 'section' },
-          { label: 'Semester', name: 'semester' },
-        ].map((f) => (
-          <div key={f.name} className="flex flex-col">
-            <label className="text-xs text-slate-300">{f.label}</label>
-            <input
-              name={f.name}
-              value={filters[f.name]}
-              onChange={handleFilterChange}
-              placeholder={f.placeholder}
-              className="mt-1 rounded-lg bg-slate-800 border border-white/10 px-3 py-2 text-sm"
-            />
-          </div>
-        ))}
+        <input name="search" value={filters.search} onChange={handleFilterChange} placeholder="Search" className="p-2 rounded-xl bg-white/5 border border-white/10" />
+        <input name="department" value={filters.department} onChange={handleFilterChange} placeholder="Department" className="p-2 rounded-xl bg-white/5 border border-white/10" />
+        <input name="section" value={filters.section} onChange={handleFilterChange} placeholder="Section" className="p-2 rounded-xl bg-white/5 border border-white/10" />
+        <input name="semester" value={filters.semester} onChange={handleFilterChange} placeholder="Semester" className="p-2 rounded-xl bg-white/5 border border-white/10" />
 
-        <div className="flex flex-col">
-          <label className="text-xs text-slate-300">Status</label>
-          <select
-            name="status"
-            value={filters.status}
-            onChange={handleFilterChange}
-            className="mt-1 rounded-lg bg-slate-800 border border-white/10 px-3 py-2 text-sm"
-          >
-            <option value="">All</option>
-            <option value="ACTIVE">Active</option>
-            <option value="INACTIVE">Inactive</option>
-            <option value="DEBARRED">Debarred</option>
-          </select>
-        </div>
+        <select name="status" value={filters.status} onChange={handleFilterChange} className="p-2 rounded-xl bg-white/5 border border-white/10">
+          <option value="">All</option>
+          <option value="ACTIVE">Active</option>
+          <option value="INACTIVE">Inactive</option>
+          <option value="DEBARRED">Debarred</option>
+        </select>
 
-        <button
-          type="submit"
-          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium hover:bg-indigo-500"
-        >
+        <button className="bg-gradient-to-r from-indigo-500 to-cyan-500 rounded-xl text-sm">
           Apply
         </button>
       </form>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Table */}
-        <div className="lg:col-span-2 rounded-xl border border-white/5 bg-slate-900/70 backdrop-blur p-4 shadow-xl overflow-x-auto">
-          <div className="flex justify-between mb-3">
-            <h3 className="text-sm font-medium">Students</h3>
-            {loading && <span className="text-xs text-slate-400">Loading…</span>}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+        {/* TABLE */}
+        <div className="xl:col-span-2 bg-white/5 border border-white/10 rounded-2xl backdrop-blur overflow-hidden">
+          <div className="px-5 py-4 border-b border-white/10 font-medium">
+            Students
           </div>
 
-          <table className="min-w-full text-xs">
-            <thead className="bg-slate-800 text-slate-300">
-              <tr>
-                <th className="px-2 py-2 text-left">Name</th>
-                <th className="px-2 py-2 text-left">Admission No</th>
-                <th className="px-2 py-2 text-left">Dept / Sec / Sem</th>
-                <th className="px-2 py-2 text-left">Status</th>
-                <th className="px-2 py-2 text-left">QR</th>
-                <th className="px-2 py-2 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.map((s) => (
-                <tr key={s._id} className="border-t border-white/5 hover:bg-white/5">
-                  <td className="px-2 py-1">{s.name}</td>
-                  <td className="px-2 py-1">{s.admissionNumber}</td>
-                  <td className="px-2 py-1">
-                    <div>{s.department}</div>
-                    <div className="text-[11px] text-slate-400">
-                      Sec {s.section} · Sem {s.semester}
-                    </div>
-                  </td>
-                  <td className="px-2 py-1">
-                    <span className={`px-2 py-0.5 rounded-full text-[11px] ${statusBadge(s.status)}`}>
-                      {s.status}
-                    </span>
-                  </td>
-                  <td className="px-2 py-1">
-                    {s.qrPayload ? (
-                      <span className="text-emerald-400">Generated</span>
-                    ) : (
-                      <span className="text-slate-400">Pending</span>
-                    )}
-                  </td>
-                  <td className="px-2 py-1 text-right space-x-1">
-                    <button
-                      onClick={() => startEdit(s)}
-                      className="px-2 py-0.5 rounded border border-white/10 hover:bg-white/10"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(s._id)}
-                      className="px-2 py-0.5 rounded border border-red-500/30 text-red-300 hover:bg-red-500/10"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {students.length === 0 && !loading && (
+          <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-white/5 text-slate-400">
                 <tr>
-                  <td colSpan={6} className="px-2 py-4 text-center text-slate-400">
-                    No students found.
-                  </td>
+                  <th className="p-3 text-left">Name</th>
+                  <th className="p-3 text-left">Admission</th>
+                  <th className="p-3 text-left">Details</th>
+                  <th className="p-3 text-left">Status</th>
+                  <th className="p-3 text-left">QR</th>
+                  <th className="p-3 text-right">Actions</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+
+              <tbody>
+                {students.map((s) => (
+                  <tr key={s._id} className="border-t border-white/10 hover:bg-white/5 transition">
+
+                    <td className="p-3 font-medium">{s.name}</td>
+                    <td className="p-3">{s.admissionNumber}</td>
+
+                    <td className="p-3 text-sm">
+                      {s.department}
+                      <div className="text-xs text-slate-400">
+                        Sec {s.section} · Sem {s.semester}
+                      </div>
+                    </td>
+
+                    <td className="p-3">
+                      <span className={`px-2 py-1 rounded-full text-xs ${statusBadge(s.status)}`}>
+                        {s.status}
+                      </span>
+                    </td>
+
+                    {/* ✅ QR COLUMN */}
+                    <td className="p-3">
+                      {s.qrPayload ? (
+                        <div className="flex flex-col gap-1">
+                          <span className="text-emerald-400 text-xs">Generated</span>
+                          <button
+                            onClick={() => downloadQR(s.qrPayload, s.name)}
+                            className="text-xs text-cyan-400 hover:underline"
+                          >
+                            Download
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 text-xs">Pending</span>
+                      )}
+                    </td>
+
+                    <td className="p-3 text-right space-x-2">
+                      <button onClick={() => startEdit(s)} className="px-3 py-1 text-xs rounded-lg border border-white/10 hover:bg-white/10">
+                        Edit
+                      </button>
+                      <button onClick={() => handleDelete(s._id)} className="px-3 py-1 text-xs rounded-lg border border-red-500/30 text-red-300 hover:bg-red-500/10">
+                        Delete
+                      </button>
+                    </td>
+
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        {/* Form */}
-        <div className="rounded-xl border border-white/5 bg-slate-900/80 backdrop-blur p-4 shadow-xl">
-          <h3 className="text-sm font-medium mb-3">
+        {/* FORM */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur">
+          <h3 className="mb-4 font-medium">
             {editingId ? 'Edit Student' : 'Add Student'}
           </h3>
 
-          <form onSubmit={handleSubmit} className="space-y-3 text-sm">
+          <form onSubmit={handleSubmit} className="space-y-3">
+
             {['name', 'admissionNumber', 'mobileNumber', 'email'].map((f) => (
-              <div key={f}>
-                <label className="block text-xs text-slate-300">{f}</label>
-                <input
-                  name={f}
-                  value={form[f]}
-                  onChange={handleChange}
-                  className="mt-1 w-full rounded-lg bg-slate-800 border border-white/10 px-3 py-2"
-                />
-              </div>
+              <input
+                key={f}
+                name={f}
+                value={form[f]}
+                onChange={handleChange}
+                placeholder={f}
+                className="w-full p-2 rounded-xl bg-white/5 border border-white/10"
+              />
             ))}
 
             <div className="grid grid-cols-3 gap-2">
@@ -276,7 +251,7 @@ function AdminStudentsPage() {
                   value={form[f]}
                   onChange={handleChange}
                   placeholder={f}
-                  className="rounded-lg bg-slate-800 border border-white/10 px-3 py-2"
+                  className="p-2 rounded-xl bg-white/5 border border-white/10"
                 />
               ))}
             </div>
@@ -285,33 +260,20 @@ function AdminStudentsPage() {
               name="status"
               value={form.status}
               onChange={handleChange}
-              className="w-full rounded-lg bg-slate-800 border border-white/10 px-3 py-2"
+              className="w-full p-2 rounded-xl bg-white/5 border border-white/10"
             >
               <option value="ACTIVE">Active</option>
               <option value="INACTIVE">Inactive</option>
               <option value="DEBARRED">Debarred</option>
             </select>
 
-            <div className="flex gap-2 pt-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-1 rounded-lg bg-indigo-600 py-2 hover:bg-indigo-500 disabled:opacity-60"
-              >
-                {editingId ? 'Update' : 'Create'}
-              </button>
-              {editingId && (
-                <button
-                  type="button"
-                  onClick={cancelEdit}
-                  className="px-4 py-2 rounded-lg border border-white/10"
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
+            <button className="w-full bg-gradient-to-r from-indigo-500 to-cyan-500 py-2 rounded-xl">
+              {editingId ? 'Update' : 'Create'}
+            </button>
+
           </form>
         </div>
+
       </div>
     </div>
   );
