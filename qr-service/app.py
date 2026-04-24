@@ -1,5 +1,5 @@
 import os
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify
 from app.routes.qr_routes import qr_bp
 
 
@@ -18,6 +18,11 @@ def create_app():
     return app
 
 
+# ✅ REQUIRED for gunicorn
+app = create_app()
+
+
+# ✅ Local run only
 if __name__ == "__main__":
-    app = create_app()
-    app.run(host="0.0.0.0", port=7001, debug=True)
+    port = int(os.environ.get("PORT", 7001))
+    app.run(host="0.0.0.0", port=port)
