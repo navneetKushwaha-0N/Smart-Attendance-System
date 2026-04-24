@@ -17,7 +17,10 @@ const router = express.Router();
 // All routes here are admin-only
 router.use(auth(USER_ROLES.ADMIN));
 
-// Create student
+
+// =========================
+// CREATE STUDENT (QR FIXED)
+// =========================
 router.post(
   '/students',
   [
@@ -36,7 +39,6 @@ router.post(
         return res.status(400).json({ errors: errors.array() });
       }
 
-      // qrSecret will be used by the Python service to generate encrypted QR
       const qrSecret = `stu_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
       let student = await Student.create({
@@ -45,31 +47,47 @@ router.post(
         qrSecret,
       });
 
-      // Call Flask service to generate encrypted QR payload (and optionally image)
+      // Call Flask QR service to generate image
       const qrBaseUrl = process.env.QR_SERVICE_BASE_URL;
+
       if (qrBaseUrl) {
         try {
           const qrRes = await axios.post(`${qrBaseUrl}/api/qr/generate`, {
             studentId: student._id,
             qrSecret: student.qrSecret,
           });
-          const { payload, imageUrl } = qrRes.data || {};
-          student.qrPayload = payload;
-          if (imageUrl) student.qrImageUrl = imageUrl;
+
+          const { payload, qrImage } = qrRes.data || {};
+
+          // ✅ FIX: qrImage (base64/url) for UI display
+          if (qrImage) {
+            student.qrPayload = qrImage;
+          }
+
+          // ✅ FIX: raw payload for validation/scanning
+          if (payload) {
+            student.qrRaw = payload;
+          }
+
           await student.save();
+
         } catch (qrErr) {
-          console.error('QR generation failed', qrErr.message || qrErr);
+          console.error('QR generation failed:', qrErr.message || qrErr);
         }
       }
 
       res.status(201).json(student);
+
     } catch (err) {
       next(err);
     }
   }
 );
 
-// Update student
+
+// =========================
+// UPDATE STUDENT
+// =========================
 router.put('/students/:id', async (req, res, next) => {
   try {
     const existing = await Student.findById(req.params.id);
@@ -80,7 +98,6 @@ router.put('/students/:id', async (req, res, next) => {
     Object.assign(existing, req.body);
     await existing.save();
 
-    // If status changed to INACTIVE or DEBARRED, notify student
     if (
       previousStatus !== existing.status &&
       [STUDENT_STATUS.INACTIVE, STUDENT_STATUS.DEBARRED].includes(existing.status)
@@ -102,7 +119,10 @@ router.put('/students/:id', async (req, res, next) => {
   }
 });
 
-// Delete student
+
+// =========================
+// DELETE STUDENT
+// =========================
 router.delete('/students/:id', async (req, res, next) => {
   try {
     const student = await Student.findByIdAndDelete(req.params.id);
@@ -113,7 +133,10 @@ router.delete('/students/:id', async (req, res, next) => {
   }
 });
 
-// List students with filters
+
+// =========================
+// LIST STUDENTS (with filters)
+// =========================
 router.get('/students', async (req, res, next) => {
   try {
     const { search, department, section, semester, status } = req.query;
@@ -136,12 +159,16 @@ router.get('/students', async (req, res, next) => {
 
     const students = await query.lean();
     res.json(students);
+
   } catch (err) {
     next(err);
   }
 });
 
-// Create teacher (with login)
+
+// =========================
+// CREATE TEACHER (with login)
+// =========================
 router.post(
   '/teachers',
   [
@@ -191,13 +218,17 @@ router.post(
         teacher,
         generatedPassword: plainPassword,
       });
+
     } catch (err) {
       next(err);
     }
   }
 );
 
-// List teachers
+
+// =========================
+// LIST TEACHERS
+// =========================
 router.get('/teachers', async (req, res, next) => {
   try {
     const teachers = await Teacher.find().lean();
@@ -207,7 +238,10 @@ router.get('/teachers', async (req, res, next) => {
   }
 });
 
-// Assign section
+
+// =========================
+// ASSIGN SECTION
+// =========================
 router.post(
   '/sections/allocate',
   [
@@ -235,13 +269,17 @@ router.post(
       });
 
       res.status(201).json(allocation);
+
     } catch (err) {
       next(err);
     }
   }
 );
 
-// List sections
+
+// =========================
+// LIST SECTIONS
+// =========================
 router.get('/sections', async (req, res, next) => {
   try {
     const sections = await SectionAllocation.find().populate('teacher').lean();
@@ -251,7 +289,10 @@ router.get('/sections', async (req, res, next) => {
   }
 });
 
-// View teacher → section → students
+
+// =========================
+// SECTION → STUDENTS
+// =========================
 router.get('/sections/:id/students', async (req, res, next) => {
   try {
     const allocation = await SectionAllocation.findById(req.params.id).populate('teacher').lean();
@@ -268,7 +309,10 @@ router.get('/sections/:id/students', async (req, res, next) => {
   }
 });
 
-// Manual attendance override
+
+// =========================
+// MANUAL ATTENDANCE OVERRIDE
+// =========================
 router.post(
   '/attendance/override',
   [
@@ -307,7 +351,10 @@ router.post(
   }
 );
 
-// Fetch teacher reports/requests
+
+// =========================
+// CONTACT REQUESTS (Teacher → Admin)
+// =========================
 router.get('/contact-requests', async (req, res, next) => {
   try {
     const requests = await ContactRequest.find().populate('teacher').populate('student');
@@ -317,7 +364,6 @@ router.get('/contact-requests', async (req, res, next) => {
   }
 });
 
-// Update teacher request (admin response)
 router.patch('/contact-requests/:id', async (req, res, next) => {
   try {
     const { status, responseMessage } = req.body;
@@ -340,7 +386,10 @@ router.patch('/contact-requests/:id', async (req, res, next) => {
   }
 });
 
-// Reports & analytics
+
+// =========================
+// REPORTS & ANALYTICS
+// =========================
 router.get('/reports/attendance-summary', async (req, res, next) => {
   try {
     const { department, section, subject, fromDate, toDate } = req.query;
@@ -362,6 +411,7 @@ router.get('/reports/attendance-summary', async (req, res, next) => {
 router.get('/reports/defaulters', async (req, res, next) => {
   try {
     const { department, section, subject, fromDate, toDate, threshold } = req.query;
+
     const defaulters = await buildDefaultersList({
       department,
       section,
@@ -376,5 +426,6 @@ router.get('/reports/defaulters', async (req, res, next) => {
     next(err);
   }
 });
+
 
 module.exports = router;
